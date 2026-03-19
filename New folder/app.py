@@ -1,162 +1,144 @@
 import streamlit as st
 import pandas as pd
+from datetime import date
 
-st.set_page_config(page_title="Ultimate School Portal", layout="centered")
+# ---------- PAGE CONFIG ----------
+st.set_page_config(page_title="Streamlit Student Portal", layout="wide", page_icon="🎓")
 
 # ---------- SESSION STATE ----------
-if "students" not in st.session_state or not isinstance(st.session_state.students, dict):
+if "users" not in st.session_state:
+    # Sample users: username: [password, role, name]
+    st.session_state.users = {
+        "student1": ["pass123", "student", "Tomiwa Akpe"],
+        "teacher1": ["teach123", "teacher", "Mrs. Johnson"],
+        "admin1": ["admin123", "admin", "Principal Smith"]
+    }
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "role" not in st.session_state:
+    st.session_state.role = None
+if "username" not in st.session_state:
+    st.session_state.username = None
+if "students" not in st.session_state:
     st.session_state.students = {}
-students = st.session_state.students
 
 # ---------- STYLE ----------
 st.markdown("""
 <style>
-body {background-color: #F4F8FB; font-family: 'Arial', sans-serif;}
-.title {text-align:center; font-size:40px; font-weight:bold; color:#2A3F5F; margin-bottom:5px;}
-.subtitle {text-align:center; font-size:18px; color:#5A6B7C; margin-bottom:25px;}
-.card {background:white; padding:30px; border-radius:20px; box-shadow:0px 10px 25px rgba(0,0,0,0.08); margin-bottom:25px;}
-.stButton>button {background:#A7C7E7; color:#000; font-size:18px; border-radius:12px; padding:12px 20px; border:none; transition:0.3s;}
-.stButton>button:hover {transform: scale(1.08); background:#91BEE0;}
-.stDataFrame>div>div>div>div {border-radius:12px; overflow:hidden;}
+body {background-color: #F0F4F8; font-family: 'Arial', sans-serif;}
+.card {background:white; padding:25px; border-radius:20px; box-shadow:0px 10px 25px rgba(0,0,0,0.08); margin-bottom:20px;}
+.stButton>button {background:#4A90E2; color:#fff; font-size:16px; border-radius:12px; padding:10px 18px; border:none; transition:0.3s;}
+.stButton>button:hover {transform: scale(1.08); background:#50E3C2;}
+.title {font-size:36px; font-weight:bold; color:#2A3F5F; text-align:center;}
+.subtitle {font-size:18px; text-align:center; color:#5A6B7C; margin-bottom:20px;}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='title'>🎓 Ultimate School Portal</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Manage Students | Reports | Analytics</div>", unsafe_allow_html=True)
+# ---------- LOGIN ----------
+if not st.session_state.logged_in:
+    st.markdown("<div class='title'>🎓 Streamlit Student Portal</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Login with your credentials</div>", unsafe_allow_html=True)
 
-# ---------- NAVIGATION ----------
-page = st.selectbox("Menu", ["Home", "Add Student", "Search/Edit", "Class Statistics", "Reports"])
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-# ---------- HOME ----------
-if page == "Home":
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.write("Welcome to the Ultimate School Portal! 👋")
-    st.write("Use the menu to add students, search and edit records, view class statistics, and export reports.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------- ADD STUDENT ----------
-elif page == "Add Student":
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("Add Student")
-    name = st.text_input("Student Name")
-    
-    subjects = []
-    scores = []
-    for i in range(5):  # max 5 subjects per student
-        col1, col2 = st.columns([2,1])
-        subjects.append(col1.text_input(f"Subject {i+1}", key=f"sub{i}"))
-        scores.append(col2.number_input(f"Score {i+1}", 0, 100, key=f"score{i}"))
-    
-    def get_grade(score):
-        if score >= 70: return "A"
-        elif score >= 60: return "B"
-        elif score >= 50: return "C"
-        elif score >= 45: return "D"
-        else: return "F"
-
-    if st.button("Save Student"):
-        if not name:
-            st.error("Enter student name")
+    if st.button("Login"):
+        if username in st.session_state.users and st.session_state.users[username][0] == password:
+            st.session_state.logged_in = True
+            st.session_state.role = st.session_state.users[username][1]
+            st.session_state.username = username
+            st.experimental_rerun()
         else:
-            data = {sub: (sc, get_grade(sc)) for sub, sc in zip(subjects, scores) if sub}
-            if data:
-                students[name] = data
-                st.success("✅ Student saved")
-            else:
-                st.error("Enter at least one subject")
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.error("Invalid credentials")
 
-# ---------- SEARCH / EDIT ----------
-elif page == "Search/Edit":
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("Search / Edit Student")
+else:
+    st.markdown(f"<div class='title'>Welcome, {st.session_state.users[st.session_state.username][2]}</div>", unsafe_allow_html=True)
     
-    if students:
-        selected = st.selectbox("Select Student", list(students.keys()))
-        data = students[selected]
-        
-        # Show table
-        df = pd.DataFrame([(sub, sc, grade) for sub, (sc, grade) in data.items()],
-                          columns=["Subject","Score","Grade"])
-        st.dataframe(df)
-        
-        # Edit
-        st.subheader("Edit Scores")
-        updated_data = {}
-        for sub, (sc, _) in data.items():
-            new_score = st.number_input(sub, 0, 100, sc, key=f"edit_{sub}")
-            updated_data[sub] = (new_score, get_grade(new_score))
-        
-        if st.button("Update Student"):
-            students[selected] = updated_data
-            st.success("Student updated ✅")
-            st.experimental_rerun()
-        
-        if st.button("Delete Student"):
-            del students[selected]
-            st.success("Student deleted 🗑")
-            st.experimental_rerun()
-    else:
-        st.info("No students yet")
-    st.markdown("</div>", unsafe_allow_html=True)
+    # ---------- LOGOUT ----------
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.role = None
+        st.session_state.username = None
+        st.experimental_rerun()
+    
+    # ---------- NAVIGATION ----------
+    tabs = ["Dashboard", "Students", "Courses", "Assignments", "Grades", "Attendance", "Timetable", "Messaging", "Events", "Resources"]
+    page = st.selectbox("Menu", tabs)
+    
+    # ---------- DASHBOARD ----------
+    if page == "Dashboard":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Quick Glance")
+        st.write("📅 Today's classes: Math, Science")
+        st.write("📌 Upcoming assignments: History essay due 2026-03-20")
+        st.write("📝 Recent grades: Tomiwa Akpe - Math: 85 (B)")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# ---------- CLASS STATISTICS ----------
-elif page == "Class Statistics":
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("Class Statistics")
-    
-    if students:
-        all_scores = []
-        names, averages = [], []
-        highest = ("", "", "", -1)
-        lowest = ("", "", "", 101)
-        
-        subject_totals = {}
-        subject_counts = {}
-        
-        for name, subs in students.items():
-            scores_list = []
-            for sub, (score, _) in subs.items():
-                scores_list.append(score)
-                subject_totals[sub] = subject_totals.get(sub,0)+score
-                subject_counts[sub] = subject_counts.get(sub,0)+1
-                if score > highest[3]: highest=(name,sub,_,score)
-                if score < lowest[3]: lowest=(name,sub,_,score)
-            avg = sum(scores_list)/len(scores_list)
-            names.append(name)
-            averages.append(avg)
-            all_scores.extend(scores_list)
-        
-        st.write(f"**Class Average:** {sum(all_scores)/len(all_scores):.2f}")
-        st.write(f"**Highest Score:** {highest[0]} - {highest[1]} ({highest[3]})")
-        st.write(f"**Lowest Score:** {lowest[0]} - {lowest[1]} ({lowest[3]})")
-        
-        # Subject averages
-        st.subheader("Subject Averages")
-        for sub in subject_totals:
-            st.write(f"{sub}: {subject_totals[sub]/subject_counts[sub]:.2f}")
-        
-        # Charts
-        chart_df = pd.DataFrame({"Student": names, "Average": averages})
-        st.bar_chart(chart_df.set_index("Student"))
-    else:
-        st.info("No data")
-    st.markdown("</div>", unsafe_allow_html=True)
+    # ---------- STUDENTS ----------
+    elif page == "Students":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Student Management")
+        name = st.text_input("Add Student Name")
+        if st.button("Add Student"):
+            if name:
+                st.session_state.students[name] = {"ID": len(st.session_state.students)+1, "Subjects": {}, "GPA":0}
+                st.success(f"Student {name} added!")
+        st.write("All Students:")
+        st.write(st.session_state.students)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# ---------- REPORTS ----------
-elif page == "Reports":
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("Export Student Data")
-    
-    if students:
-        export_df = pd.DataFrame(columns=["Student","Subject","Score","Grade"])
-        for name, subs in students.items():
-            for sub,(score, grade) in subs.items():
-                export_df = pd.concat([export_df,pd.DataFrame([[name,sub,score,grade]],columns=export_df.columns)],ignore_index=True)
-        
-        st.dataframe(export_df)
-        st.download_button("Download CSV", export_df.to_csv(index=False), "students.csv", "text/csv")
-        st.download_button("Download Excel", export_df.to_excel(index=False, engine='openpyxl'), "students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    else:
-        st.info("No data")
-    st.markdown("</div>", unsafe_allow_html=True)
+    # ---------- COURSES ----------
+    elif page == "Courses":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Courses & Enrollment")
+        st.write("Course list, enrollment status here")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- ASSIGNMENTS ----------
+    elif page == "Assignments":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Assignments")
+        st.write("Upload / download / submission dates")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- GRADES ----------
+    elif page == "Grades":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Grades & Feedback")
+        st.write("Student grades and GPA tracker")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- ATTENDANCE ----------
+    elif page == "Attendance":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Attendance Tracker")
+        st.write("Daily logs and bar chart visualization")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- TIMETABLE ----------
+    elif page == "Timetable":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Timetable")
+        st.write("Daily/Weekly view with clickable class details")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- MESSAGING ----------
+    elif page == "Messaging":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Messaging")
+        st.write("Send messages to teachers / students")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- EVENTS ----------
+    elif page == "Events":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Events & Campus Life")
+        st.write("Clubs, seminars, workshops, event registration")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- RESOURCES ----------
+    elif page == "Resources":
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Library & Resources")
+        st.write("Searchable PDFs, e-books, documents")
+        st.markdown("</div>", unsafe_allow_html=True)
